@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<!--
+  Transcript Player
+
+  Copyright (c) 2026 Paddywack Productions Ltd. All rights reserved.
+
+  This file and its contents are proprietary and confidential to
+  Paddywack Productions Ltd. It is intended for internal use only and
+  for distribution to Paddywack Productions Ltd's clients and collaborators
+  in connection with its productions. No part of it may be copied,
+  reproduced, or redistributed for any other purpose without prior
+  written permission.
+
+  Provided "as is", without warranty of any kind, express or implied.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transcript Player</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f7f7f5;
+    --panel: #ffffff;
+    --border: #e0e0dc;
+    --text: #1c1c1a;
+    --muted: #6b6b66;
+    --accent: #2f6f4f;
+    --accent-bg: #e4f0e8;
+    --speaker: #8a5a2b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17181a;
+      --panel: #202124;
+      --border: #35363a;
+      --text: #ececec;
+      --muted: #9b9b9b;
+      --accent: #6fcf97;
+      --accent-bg: #1f3329;
+      --speaker: #d9a86c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17181a;
+    --panel: #202124;
+    --border: #35363a;
+    --text: #ececec;
+    --muted: #9b9b9b;
+    --accent: #6fcf97;
+    --accent-bg: #1f3329;
+    --speaker: #d9a86c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 20px;
+  }
+  .top-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  h1 {
+    font-size: 18px;
+    margin: 0 0 4px;
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 13px;
+    margin: 0 0 16px;
+  }
+  #themeToggle {
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  #themeToggle:hover { background: var(--accent-bg); }
+  .layout {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .left, .right {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .left {
+    flex: 1 1 480px;
+    min-width: 320px;
+  }
+  .right {
+    flex: 1 1 380px;
+    min-width: 300px;
+    display: flex;
+    flex-direction: column;
+    max-height: 80vh;
+  }
+  details {
+    margin-bottom: 14px;
+  }
+  details > summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text);
+    padding: 4px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    -webkit-user-select: none;
+    user-select: none;
+    list-style: none;
+  }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary::before {
+    content: '▸';
+    display: inline-block;
+    font-size: 10px;
+    color: var(--muted);
+    transition: transform 0.15s ease;
+  }
+  details[open] > summary::before {
+    transform: rotate(90deg);
+  }
+  details > summary:hover { color: var(--accent); }
+  details[open] > summary {
+    margin-bottom: 4px;
+  }
+  .pickers {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .picker {
+    flex: 1 1 200px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .file-btn {
+    display: inline-block;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .file-btn:hover { background: var(--accent-bg); }
+  .file-name {
+    font-size: 12px;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .info-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    border: 1px solid var(--muted);
+    color: var(--muted);
+    font-size: 10px;
+    font-style: normal;
+    cursor: help;
+    flex: none;
+  }
+  video {
+    width: 100%;
+    border-radius: 6px;
+    background: #000;
+    display: block;
+  }
+  .placeholder {
+    aspect-ratio: 16/9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 13px;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+  }
+  .offset-row {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 13px;
+  }
+  .offset-row span.label {
+    color: var(--muted);
+  }
+  .offset-row button {
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 4px 9px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .offset-row button:hover { background: var(--accent-bg); }
+  .chunk-mode-btn.active {
+    background: var(--accent-bg);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .offset-row input[type="number"] {
+    width: 70px;
+    padding: 4px 6px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--text);
+    font-size: 13px;
+  }
+  .hint {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 6px;
+    line-height: 1.4;
+  }
+  .right h2 {
+    font-size: 14px;
+    margin: 0 0 10px;
+  }
+  #transcript {
+    overflow-y: auto;
+    flex: 1;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+  }
+  .cue {
+    padding: 7px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-bottom: 2px;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .cue:hover { background: var(--accent-bg); }
+  .cue.active {
+    background: var(--accent-bg);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  .cue .speaker {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--speaker);
+    margin-bottom: 1px;
+  }
+  .cue .time {
+    color: var(--muted);
+    font-size: 11px;
+    margin-right: 6px;
+  }
+  .empty {
+    color: var(--muted);
+    font-size: 13px;
+    padding: 8px;
+  }
+  #folderStatus {
+    font-size: 13px;
+    color: var(--muted);
+    margin: -6px 0 14px;
+  }
+  .search-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .search-row input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 13px;
+  }
+  .search-row button {
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .search-row button:hover { background: var(--accent-bg); }
+  #searchCount {
+    white-space: nowrap;
+    font-size: 12px;
+  }
+  mark {
+    background: #ffd54a;
+    color: #1c1c1a;
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+  .cue.search-current {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+  .pair-select-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 4px 0;
+  }
+  .pair-select-row select {
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 13px;
+    max-width: 100%;
+  }
+</style>
+</head>
+<body>
+
+  <div class="top-row">
+    <div>
+      <h1>Transcript Player</h1>
+      <p class="subtitle">Choose the folder where your transcript and video files are saved, or load a video and its transcript individually. Click any line to jump the video to that point.</p>
+    </div>
+    <button id="themeToggle" type="button">Switch to dark</button>
+  </div>
+
+  <div class="layout">
+    <div class="left">
+      <details id="loadFilesDetails" open>
+        <summary>Load files</summary>
+        <div class="pickers">
+          <div class="picker" style="flex-basis:100%;">
+            <input type="file" id="folderInput" webkitdirectory multiple class="visually-hidden">
+            <label class="file-btn" for="folderInput">Choose folder</label>
+            <span class="file-name" id="folderFileName">No folder chosen</span>
+            <i class="info-icon" tabindex="0" title="Auto-pairs a video with a same-named .srt/.srtx in the folder you pick. If there's more than one matching pair, you'll get a list to choose from.">i</i>
+          </div>
+        </div>
+
+        <div class="pickers">
+          <div class="picker">
+            <input type="file" id="videoInput" accept="video/*" class="visually-hidden">
+            <label class="file-btn" for="videoInput">Choose video</label>
+            <span class="file-name" id="videoFileName">No file chosen</span>
+          </div>
+          <div class="picker">
+            <input type="file" id="transcriptInput" accept=".srt,.srtx,.vtt,.txt" class="visually-hidden">
+            <label class="file-btn" for="transcriptInput">Choose transcript</label>
+            <span class="file-name" id="transcriptFileName">No file chosen</span>
+          </div>
+        </div>
+      </details>
+      <div id="folderStatus"></div>
+
+      <div id="videoWrap">
+        <div class="placeholder" id="videoPlaceholder">No video loaded yet</div>
+        <video id="video" controls style="display:none;"></video>
+      </div>
+
+      <details id="offsetDetails">
+        <summary>Offset</summary>
+        <div class="offset-row">
+          <span class="label">Video timeline start:</span>
+          <input type="text" id="startTcInput" value="00:00:00" size="9">
+          <button id="startTcApply">Apply</button>
+          <button id="startTcGuess">Auto-guess</button>
+          <i class="info-icon" tabindex="0" title="Should match your Resolve project's Start Timecode (Project Settings → General) for this timeline — the point the exported video's frame 0 lines up with. Auto-guess rounds the transcript's first line down to the nearest hour, which is usually right but not guaranteed — type the real value in if the guess is off.">i</i>
+        </div>
+
+        <div class="offset-row">
+          <span class="label">Sync offset:</span>
+          <button id="offsetMinus">&minus;0.5s</button>
+          <input type="number" id="offsetValue" step="0.1" value="0">
+          <button id="offsetPlus">+0.5s</button>
+          <button id="offsetReset">Reset</button>
+          <i class="info-icon" tabindex="0" title="Only for small nudges once the timeline start above is correct — a frame or two of rounding. If a line is out by tens of seconds or more, fix the timeline start first instead.">i</i>
+        </div>
+      </details>
+
+      <details id="groupingDetails">
+        <summary>Transcript Grouping</summary>
+        <div class="offset-row">
+          <span class="label">Group lines by:</span>
+          <button class="chunk-mode-btn" data-mode="line">Per-line</button>
+          <button class="chunk-mode-btn" data-mode="sentence">Sentence</button>
+          <button class="chunk-mode-btn" data-mode="paragraph">Paragraph</button>
+          <i class="info-icon" tabindex="0" title="Per-line shows the original subtitle-length cues with no merging. Sentence merges lines into full sentences. Paragraph (default) merges more aggressively, running multiple sentences together until a longer pause or a speaker change.">i</i>
+        </div>
+      </details>
+    </div>
+
+    <div class="right">
+      <h2>Transcript <i class="info-icon" tabindex="0" title="Drag to select a run of lines, then copy (Ctrl/Cmd+C) — you'll get clean speaker-labelled dialogue with timestamps, ready to paste into a script.">i</i></h2>
+      <div class="search-row">
+        <input type="text" id="searchInput" placeholder="Search transcript…">
+        <span id="searchCount" class="file-name"></span>
+        <button id="searchPrev" type="button" title="Previous match">&uarr;</button>
+        <button id="searchNext" type="button" title="Next match">&darr;</button>
+      </div>
+      <div id="transcript"><div class="empty">Load a transcript file to see it here.</div></div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  var video = document.getElementById('video');
+  var videoPlaceholder = document.getElementById('videoPlaceholder');
+  var videoInput = document.getElementById('videoInput');
+  var transcriptInput = document.getElementById('transcriptInput');
+  var folderInput = document.getElementById('folderInput');
+  var folderStatusEl = document.getElementById('folderStatus');
+  var transcriptEl = document.getElementById('transcript');
+  var offsetValueEl = document.getElementById('offsetValue');
+  var startTcInput = document.getElementById('startTcInput');
+  var searchInput = document.getElementById('searchInput');
+  var searchCountEl = document.getElementById('searchCount');
+  var loadFilesDetails = document.getElementById('loadFilesDetails');
+
+  var cues = [];        // {index, start, end, speaker, text, el} — the currently displayed (chunked) cues
+  var rawCues = [];     // the un-merged, subtitle-length cues straight from parseTranscript
+  var chunkMode = 'paragraph';
+  var activeCue = null;
+  var searchMatches = []; // cue indices containing the current search term
+  var searchCurrent = -1; // index into searchMatches
+  var userOffset = 0;
+
+  // ---- Timecode parsing ----
+  function timecodeToSeconds(tc) {
+    // HH:MM:SS,mmm  or  HH:MM:SS.mmm
+    var m = tc.match(/(\d{2}):(\d{2}):(\d{2})[,.](\d{3})/);
+    if (!m) return null;
+    var h = parseInt(m[1], 10), mi = parseInt(m[2], 10), s = parseInt(m[3], 10), ms = parseInt(m[4], 10);
+    return h * 3600 + mi * 60 + s + ms / 1000;
+  }
+
+  function formatSeconds(sec) {
+    if (sec < 0) sec = 0;
+    var h = Math.floor(sec / 3600);
+    var m = Math.floor((sec % 3600) / 60);
+    var s = Math.floor(sec % 60);
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+    return (h > 0 ? h + ':' : '') + (h > 0 ? pad(m) : m) + ':' + pad(s);
+  }
+
+  // ---- Transcript parsing (SRT-style, tolerant of Resolve's speaker line) ----
+  function parseTranscript(text) {
+    var lines = text.replace(/\r\n?/g, '\n').split('\n');
+    var result = [];
+    var i = 0;
+
+    while (i < lines.length) {
+      // Skip blank lines
+      while (i < lines.length && lines[i].trim() === '') i++;
+      if (i >= lines.length) break;
+
+      // Cue index line (a bare integer) — optional, skip if present
+      if (/^\d+$/.test(lines[i].trim())) {
+        i++;
+      }
+      if (i >= lines.length) break;
+
+      // Timecode line
+      var tcMatch = lines[i].match(/(\d{2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[,.]\d{3})/);
+      if (!tcMatch) {
+        // Not a timecode line where expected — skip forward to resync
+        i++;
+        continue;
+      }
+      var start = timecodeToSeconds(tcMatch[1]);
+      var end = timecodeToSeconds(tcMatch[2]);
+      i++;
+
+      // Resolve's export always puts exactly one "speaker slot" line right
+      // after the timecode — it's either a speaker name, or blank (for
+      // non-speech cues like "(Muffled Talking)"). Consume it unconditionally
+      // so a blank slot doesn't get mistaken for the block's terminating
+      // blank line (that bug was silently dropping every sound-effect cue).
+      var speakerLine = (i < lines.length) ? lines[i] : '';
+      i++;
+
+      var textLines = [];
+      while (i < lines.length && lines[i].trim() !== '') {
+        textLines.push(lines[i]);
+        i++;
+      }
+
+      var speaker = speakerLine.trim();
+      var text = textLines.join(' ').replace(/\s+/g, ' ').trim();
+
+      if (!text && speaker) {
+        // No separate text line followed — this must be a plain transcript
+        // with no speaker-slot convention, and what we consumed as the
+        // "speaker" was actually the cue's only text line.
+        text = speaker;
+        speaker = '';
+      }
+
+      if (start !== null && end !== null && text) {
+        result.push({ start: start, end: end, speaker: speaker, text: text });
+      }
+    }
+
+    return result;
+  }
+
+  // ---- Merge fine-grained subtitle cues into readable chunks ----
+  // Resolve's cues are subtitle-length (a handful of words each); reading a
+  // whole sentence (or more) in one highlighted block is easier to follow.
+  // How aggressively lines get merged is controlled by three independent
+  // knobs, bundled into named presets below: how long a pause counts as a
+  // break, a safety cap on chunk length for punctuation-free runs, and
+  // whether sentence-ending punctuation forces a break on its own. A
+  // speaker change always forces a break regardless of preset — merging two
+  // different people's lines together would be actively misleading.
+  var SENTENCE_END = /[.!?]["'”’)\]]?\s*$/;
+
+  var CHUNK_PRESETS = {
+    // Per-line: no merging — handled as a special case below, not via these options.
+    sentence: { gapSeconds: 1.0, maxChars: 220, respectSentenceEnd: true },
+    paragraph: { gapSeconds: 3.0, maxChars: 500, respectSentenceEnd: false }
+  };
+
+  function mergeCues(rawCues, opts) {
+    var chunks = [];
+    var current = null;
+
+    rawCues.forEach(function (cue) {
+      var startNew =
+        !current ||
+        cue.speaker !== current.speaker ||
+        (cue.start - current.end) > opts.gapSeconds ||
+        (opts.respectSentenceEnd && SENTENCE_END.test(current.text)) ||
+        current.text.length > opts.maxChars;
+
+      if (startNew) {
+        current = { start: cue.start, end: cue.end, speaker: cue.speaker, text: cue.text };
+        chunks.push(current);
+      } else {
+        current.text = (current.text + ' ' + cue.text).replace(/\s+/g, ' ').trim();
+        current.end = cue.end;
+      }
+    });
+
+    return chunks;
+  }
+
+  function applyChunking(rawCues, mode) {
+    if (mode === 'line') {
+      return rawCues.map(function (c) {
+        return { start: c.start, end: c.end, speaker: c.speaker, text: c.text };
+      });
+    }
+    return mergeCues(rawCues, CHUNK_PRESETS[mode] || CHUNK_PRESETS.sentence);
+  }
+
+  // ---- Rendering ----
+  function renderTranscript() {
+    transcriptEl.innerHTML = '';
+    if (!cues.length) {
+      transcriptEl.innerHTML = '<div class="empty">No cues parsed from that file.</div>';
+      return;
+    }
+    cues.forEach(function (cue, idx) {
+      var div = document.createElement('div');
+      div.className = 'cue';
+      div.dataset.idx = idx;
+      var speakerHtml = cue.speaker ? '<span class="speaker">' + escapeHtml(cue.speaker) + '</span>' : '';
+      div.innerHTML =
+        speakerHtml +
+        '<span class="time">' + formatSeconds(cue.start - rawBaseOffset) + '</span>' +
+        '<span class="text">' + highlightMatches(cue.text) + '</span>';
+      div.addEventListener('click', function () {
+        jumpToCue(idx);
+      });
+      transcriptEl.appendChild(div);
+      cue.el = div;
+    });
+  }
+
+  function escapeHtml(str) {
+    var d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  function escapeRegExp(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  // Wraps every occurrence of the current search term in <mark>, operating
+  // on already-HTML-escaped text so it's safe to drop straight into innerHTML.
+  function highlightMatches(rawText) {
+    var escaped = escapeHtml(rawText);
+    var q = searchInput.value.trim();
+    if (!q) return escaped;
+    var re = new RegExp(escapeRegExp(escapeHtml(q)), 'gi');
+    return escaped.replace(re, function (m) { return '<mark>' + m + '</mark>'; });
+  }
+
+  function jumpToCue(idx) {
+    var cue = cues[idx];
+    if (!cue || !video.src) return;
+    var target = cue.start - baseOffset() + userOffset;
+    video.currentTime = Math.max(0, target);
+    video.play();
+  }
+
+  // rawBaseOffset is the timeline timecode that the exported video's frame 0
+  // corresponds to (e.g. 10:00:00,000). We subtract it from every cue so cue
+  // times are relative to the start of the video. This is NOT necessarily
+  // the first cue's own timestamp — there can be silence/lead-in before the
+  // first line is spoken, so treating cue 0 as "the start" undercounts that
+  // lead-in and throws everything after it off by that amount.
+  var rawBaseOffset = 0;
+  function baseOffset() { return rawBaseOffset; }
+
+  function guessStartTimecode() {
+    // Best-effort default: round the first cue's timestamp down to the
+    // nearest hour, since editing timelines conventionally start on a round
+    // hour (e.g. 01:00:00:00 or 10:00:00:00). Not guaranteed — the user can
+    // type the real value from Resolve's Project Settings instead.
+    if (!cues.length) return 0;
+    return Math.floor(cues[0].start / 3600) * 3600;
+  }
+
+  function formatTimecodeHMS(sec) {
+    var h = Math.floor(sec / 3600);
+    var m = Math.floor((sec % 3600) / 60);
+    var s = Math.floor(sec % 60);
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+    return pad(h) + ':' + pad(m) + ':' + pad(s);
+  }
+
+  function parseTimecodeHMS(str) {
+    var m = String(str).trim().match(/^(\d{1,2}):(\d{2}):(\d{2})/);
+    if (!m) return null;
+    return parseInt(m[1], 10) * 3600 + parseInt(m[2], 10) * 60 + parseInt(m[3], 10);
+  }
+
+  function applyStartTimecode(sec) {
+    rawBaseOffset = sec;
+    startTcInput.value = formatTimecodeHMS(sec);
+    activeCue = null;
+    renderTranscript();
+  }
+
+  // ---- Highlighting on playback ----
+  function updateActiveCue() {
+    if (!cues.length) return;
+    var t = video.currentTime;
+    var found = null;
+    for (var i = 0; i < cues.length; i++) {
+      var relStart = cues[i].start - rawBaseOffset + userOffset;
+      var relEnd = cues[i].end - rawBaseOffset + userOffset;
+      if (t >= relStart && t < relEnd) { found = i; break; }
+      if (t < relStart) break; // cues are in order; no need to scan further
+    }
+    if (found !== activeCue) {
+      if (activeCue !== null && cues[activeCue] && cues[activeCue].el) {
+        cues[activeCue].el.classList.remove('active');
+      }
+      activeCue = found;
+      if (activeCue !== null && cues[activeCue].el) {
+        cues[activeCue].el.classList.add('active');
+        cues[activeCue].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+
+  // ---- File loading (shared by the manual pickers and folder auto-pairing) ----
+  function loadVideoFile(file) {
+    var url = URL.createObjectURL(file);
+    video.src = url;
+    video.style.display = 'block';
+    videoPlaceholder.style.display = 'none';
+  }
+
+  function loadTranscriptFile(file, callback) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      rawCues = parseTranscript(String(reader.result));
+      cues = applyChunking(rawCues, chunkMode);
+      applyStartTimecode(guessStartTimecode());
+      // Re-apply any existing search against the newly loaded cues (the
+      // render above already reflects the query's highlighting; this just
+      // refreshes the match count / current-match state to match it).
+      computeSearchMatches();
+      updateSearchUI();
+      maybeCollapseLoadFiles();
+      if (callback) callback();
+    };
+    reader.readAsText(file);
+  }
+
+  // Once both a video and a transcript are loaded, the picker controls have
+  // done their job — fold them away so they're not competing for space with
+  // the video and transcript. The arrow reopens them any time.
+  function maybeCollapseLoadFiles() {
+    if (video.src && cues.length) {
+      loadFilesDetails.open = false;
+    }
+  }
+
+  videoInput.addEventListener('change', function (e) {
+    var file = e.target.files[0];
+    if (file) {
+      loadVideoFile(file);
+      document.getElementById('videoFileName').textContent = file.name;
+      maybeCollapseLoadFiles();
+    }
+  });
+
+  transcriptInput.addEventListener('change', function (e) {
+    var file = e.target.files[0];
+    if (file) {
+      loadTranscriptFile(file);
+      document.getElementById('transcriptFileName').textContent = file.name;
+    }
+  });
+
+  video.addEventListener('timeupdate', updateActiveCue);
+
+  // ---- Folder auto-pairing ----
+  // A single <input type=file> can only ever see the one file the person
+  // picked — browsers deliberately don't expose its sibling files, for
+  // privacy reasons. Seeing "what else is in this folder" requires the
+  // person to grant access to the whole folder instead, which is what this
+  // picker does; it then matches video/transcript files that share a
+  // filename (ignoring extension) and auto-loads the pair.
+  var VIDEO_EXT = /\.(mp4|mov|m4v|webm|mkv|avi)$/i;
+  var TRANSCRIPT_EXT = /\.(srt|srtx|vtt)$/i;
+
+  function stemAndDir(file) {
+    var relPath = file.webkitRelativePath || file.name;
+    var parts = relPath.split('/');
+    var base = parts.pop();
+    var stem = base.replace(/\.[^.]+$/, '').toLowerCase();
+    return parts.join('/').toLowerCase() + '/' + stem;
+  }
+
+  function pairLabel(pair) {
+    return pair.video.name.replace(/\.[^.]+$/, '');
+  }
+
+  function loadPair(pair) {
+    loadVideoFile(pair.video);
+    loadTranscriptFile(pair.transcript);
+  }
+
+  folderInput.addEventListener('change', function (e) {
+    var files = Array.prototype.slice.call(e.target.files);
+    document.getElementById('folderFileName').textContent =
+      files.length ? (files.length + ' files scanned') : 'No folder chosen';
+    var groups = {}; // key -> { video: File?, transcript: File? }
+
+    files.forEach(function (file) {
+      var isVideo = VIDEO_EXT.test(file.name);
+      var isTranscript = TRANSCRIPT_EXT.test(file.name);
+      if (!isVideo && !isTranscript) return;
+      var key = stemAndDir(file);
+      if (!groups[key]) groups[key] = { video: null, transcript: null };
+      if (isVideo) groups[key].video = file;
+      if (isTranscript) groups[key].transcript = file;
+    });
+
+    var allGroups = Object.keys(groups).map(function (k) { return groups[k]; });
+    var pairs = allGroups.filter(function (g) { return g.video && g.transcript; });
+    var orphanCount = allGroups.length - pairs.length;
+
+    folderStatusEl.innerHTML = '';
+
+    if (pairs.length === 0) {
+      folderStatusEl.textContent =
+        "Couldn't find a video + transcript pair with matching filenames in that folder. " +
+        'Use the individual pickers below instead.';
+      return;
+    }
+
+    // A persistent dropdown of every matched pair in the folder — stays
+    // visible so the person can switch clips later without re-choosing the
+    // folder each time. Selecting an entry loads it immediately.
+    var row = document.createElement('div');
+    row.className = 'pair-select-row';
+
+    var labelSpan = document.createElement('span');
+    labelSpan.className = 'file-name';
+    labelSpan.textContent = pairs.length + (pairs.length === 1 ? ' clip:' : ' clips:');
+    row.appendChild(labelSpan);
+
+    var select = document.createElement('select');
+    select.id = 'pairSelect';
+    pairs.forEach(function (pair, i) {
+      var opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = pairLabel(pair);
+      select.appendChild(opt);
+    });
+    select.addEventListener('change', function () {
+      loadPair(pairs[parseInt(select.value, 10)]);
+    });
+    row.appendChild(select);
+    folderStatusEl.appendChild(row);
+
+    if (orphanCount > 0) {
+      var note = document.createElement('div');
+      note.className = 'file-name';
+      note.style.marginTop = '4px';
+      note.textContent =
+        orphanCount + (orphanCount === 1 ? ' other file has' : ' other files have') +
+        ' no matching video/transcript and ' + (orphanCount === 1 ? "wasn't" : "weren't") + ' listed.';
+      folderStatusEl.appendChild(note);
+    }
+
+    loadPair(pairs[0]);
+  });
+
+  // ---- Copy selected transcript text as clean script text ----
+  // A plain drag-select-and-copy would grab the timestamp badges and
+  // speaker labels interleaved with the DOM structure. Intercepting the
+  // copy event lets us hand back clean text instead: a "[time] SPEAKER:"
+  // heading whenever the speaker (or SFX/silence) changes, dialogue
+  // underneath, so a pasted section is still traceable back to the video.
+  transcriptEl.addEventListener('copy', function (e) {
+    var sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+    var range = sel.getRangeAt(0);
+
+    var cueEls = Array.prototype.slice.call(transcriptEl.querySelectorAll('.cue'));
+    var included = cueEls.filter(function (el) { return range.intersectsNode(el); });
+    if (!included.length) return;
+
+    var lines = [];
+    var lastKey; // tracks speaker changes (including named <-> unlabelled SFX)
+    included.forEach(function (el) {
+      var idx = parseInt(el.dataset.idx, 10);
+      var cue = cues[idx];
+      if (!cue) return;
+      var key = cue.speaker || '';
+      if (key !== lastKey) {
+        if (lines.length) lines.push('');
+        var ts = '[' + formatSeconds(cue.start - rawBaseOffset) + ']';
+        lines.push(cue.speaker ? ts + ' ' + cue.speaker.toUpperCase() + ':' : ts);
+        lastKey = key;
+      }
+      lines.push(cue.text);
+    });
+
+    e.clipboardData.setData('text/plain', lines.join('\n').trim());
+    e.preventDefault();
+  });
+
+  // ---- Search within the transcript ----
+  function computeSearchMatches() {
+    var q = searchInput.value.trim().toLowerCase();
+    searchMatches = [];
+    if (q) {
+      cues.forEach(function (cue, idx) {
+        var hit = cue.text.toLowerCase().indexOf(q) !== -1 ||
+          (cue.speaker && cue.speaker.toLowerCase().indexOf(q) !== -1);
+        if (hit) searchMatches.push(idx);
+      });
+    }
+    searchCurrent = searchMatches.length ? 0 : -1;
+  }
+
+  function updateSearchUI() {
+    cues.forEach(function (c) { if (c.el) c.el.classList.remove('search-current'); });
+
+    if (!searchInput.value.trim()) {
+      searchCountEl.textContent = '';
+      return;
+    }
+    if (!searchMatches.length) {
+      searchCountEl.textContent = 'No matches';
+      return;
+    }
+    searchCountEl.textContent = (searchCurrent + 1) + ' of ' + searchMatches.length;
+    var idx = searchMatches[searchCurrent];
+    if (cues[idx] && cues[idx].el) {
+      cues[idx].el.classList.add('search-current');
+      cues[idx].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }
+
+  // Re-renders the transcript (so <mark> highlighting reflects the new
+  // query) then restores the playback highlight, since a fresh render
+  // creates new DOM nodes that don't carry the old 'active' class over.
+  function runSearch() {
+    computeSearchMatches();
+    renderTranscript();
+    if (activeCue !== null && cues[activeCue] && cues[activeCue].el) {
+      cues[activeCue].el.classList.add('active');
+    }
+    updateSearchUI();
+  }
+
+  function goToMatch(delta) {
+    if (!searchMatches.length) return;
+    searchCurrent = (searchCurrent + delta + searchMatches.length) % searchMatches.length;
+    updateSearchUI();
+  }
+
+  searchInput.addEventListener('input', runSearch);
+  searchInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      goToMatch(e.shiftKey ? -1 : 1);
+    } else if (e.key === 'Escape') {
+      searchInput.value = '';
+      runSearch();
+    }
+  });
+  document.getElementById('searchNext').addEventListener('click', function () { goToMatch(1); });
+  document.getElementById('searchPrev').addEventListener('click', function () { goToMatch(-1); });
+
+  // ---- Light / dark theme toggle ----
+  var THEME_KEY = 'transcript-player-theme';
+  function getStoredTheme() {
+    try { return localStorage.getItem(THEME_KEY); } catch (err) { return null; }
+  }
+  function storeTheme(v) {
+    try { localStorage.setItem(THEME_KEY, v); } catch (err) { /* ignore — private mode etc. */ }
+  }
+  function systemPrefersDark() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  var themeToggleBtn = document.getElementById('themeToggle');
+  function applyTheme(theme) {
+    // theme is 'light', 'dark', or null (follow system)
+    if (theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+    var effectiveDark = theme ? theme === 'dark' : systemPrefersDark();
+    themeToggleBtn.textContent = effectiveDark ? 'Switch to light' : 'Switch to dark';
+  }
+  themeToggleBtn.addEventListener('click', function () {
+    var current = document.documentElement.getAttribute('data-theme');
+    var effectiveDark = current ? current === 'dark' : systemPrefersDark();
+    var next = effectiveDark ? 'light' : 'dark';
+    applyTheme(next);
+    storeTheme(next);
+  });
+  // Default to dark on first run; once the person picks a theme, that
+  // choice is what gets remembered (and re-applied) from then on.
+  applyTheme(getStoredTheme() || 'dark');
+
+  // ---- Start timecode controls ----
+  document.getElementById('startTcApply').addEventListener('click', function () {
+    var v = parseTimecodeHMS(startTcInput.value);
+    if (v !== null) applyStartTimecode(v);
+  });
+  document.getElementById('startTcGuess').addEventListener('click', function () {
+    applyStartTimecode(guessStartTimecode());
+  });
+  startTcInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      var v = parseTimecodeHMS(startTcInput.value);
+      if (v !== null) applyStartTimecode(v);
+    }
+  });
+
+  // ---- Offset controls ----
+  function setOffset(v) {
+    userOffset = Math.round(v * 10) / 10;
+    offsetValueEl.value = userOffset;
+  }
+  document.getElementById('offsetMinus').addEventListener('click', function () { setOffset(userOffset - 0.5); });
+  document.getElementById('offsetPlus').addEventListener('click', function () { setOffset(userOffset + 0.5); });
+  document.getElementById('offsetReset').addEventListener('click', function () { setOffset(0); });
+  offsetValueEl.addEventListener('change', function () { setOffset(parseFloat(offsetValueEl.value) || 0); });
+
+  // ---- Transcript grouping controls ----
+  var chunkModeButtons = Array.prototype.slice.call(document.querySelectorAll('.chunk-mode-btn'));
+
+  function updateChunkModeButtons() {
+    chunkModeButtons.forEach(function (btn) {
+      btn.classList.toggle('active', btn.dataset.mode === chunkMode);
+    });
+  }
+
+  function setChunkMode(mode) {
+    chunkMode = mode;
+    updateChunkModeButtons();
+    if (!rawCues.length) return;
+    cues = applyChunking(rawCues, chunkMode);
+    // Chunk boundaries have changed, so any previous "active" cue index no
+    // longer means anything — let the next timeupdate tick re-establish it,
+    // same as applyStartTimecode does when cue timing changes.
+    activeCue = null;
+    renderTranscript();
+    computeSearchMatches();
+    updateSearchUI();
+  }
+
+  chunkModeButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () { setChunkMode(btn.dataset.mode); });
+  });
+  updateChunkModeButtons();
+
+  // Expose internals for external testing (harmless in normal use)
+  window.__parseTranscript = parseTranscript;
+  window.__applyChunking = applyChunking;
+})();
+</script>
+</body>
+</html>
